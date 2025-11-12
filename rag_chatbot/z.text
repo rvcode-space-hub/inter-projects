@@ -1,0 +1,3 @@
+Pinecone = pcsk_C8XZB_L41K5AkczMqPk8p34ecbj2tgDgkGevtoWHA5ngvTx93TNjDwoDFnJ8Xp4LKVCHR
+AI SKD = npm install @ai-sdk/google
+ShadCN UI = npx shadcn@latest init
