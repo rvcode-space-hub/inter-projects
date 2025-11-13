@@ -2,6 +2,10 @@ import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 
 
+export async function GET() {
+  return new Response("✅ RAG Chatbot API ", { status: 200 });
+}
+
 export async function POST(req) {
   try {
     const { prompt } = await req.json();

@@ -100,6 +100,7 @@ function ChatMessage({ message }) {
   );
 }
 
+
 export default function RAGChatbot() {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -111,41 +112,45 @@ export default function RAGChatbot() {
   }, [messages]);
 
   const sendMessage = async (text) => {
-  if (!text.trim()) return;
+    if (!text.trim()) return;
 
-  const userMessage = { role: 'user', content: text.trim() };
-  setMessages((prev) => [...prev, userMessage]);
-  setIsLoading(true);
+    const userMessage = { role: 'user', content: text.trim() };
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
 
-  try {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        role: "user",
-        prompt: text,
-      }),
-    });
+    try {
+      const res = await fetch("http://localhost:3000/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: "user",
+          prompt: text,
+        }),
+      });
 
-    const data = await res.json();
-    console.log("🔍 API Response:", data);
+    
 
-    const botReply = {
-      role: 'assistant',
-      content: data.response || data.text || data.message || '❌ No response from AI.',
-    };
 
-    setMessages((prev) => [...prev, botReply]);
-  } catch (err) {
-    console.error("Fetch Error:", err);
-    setMessages((prev) => [
-      ...prev,
-      { role: 'assistant', content: '⚠️ Error fetching AI response.' },
-    ]);
-  } finally {
-    setIsLoading(false);
-  }
-};
+
+      const data = await res.json();
+      console.log("🔍 API Response:", data);
+
+      const botReply = {
+        role: 'assistant',
+        content: data.response || data.text || data.message || '❌ No response from AI.',
+      };
+
+      setMessages((prev) => [...prev, botReply]);
+    } catch (err) {
+      console.error("Fetch Error:", err);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: '⚠️ Error fetching AI response.' },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSend = () => sendMessage(input);
   const handleKey = (e) => {
