@@ -1,0 +1,403 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { 
+  Plus, Search, MessageSquare, X, MoreVertical, 
+  Trash2, Edit2, Check, Folder,  
+} from 'lucide-react';
+
+export default function Sidebar({ isOpen, onClose, currentChatId, onChatSelect, onProjectSelect }) {
+  const [conversations, setConversations] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [showMenu, setShowMenu] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+
+  useEffect(() => {
+    fetchConversations();
+    fetchProjects();
+  }, []);
+
+  // ✅ Fetch chats
+  const fetchConversations = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('http://localhost:3000/api/chat');
+      const data = await res.json();
+      setConversations(data.conversations || []);
+    } catch (err) {
+      console.error('Chat fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Fetch projects
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch('/api/project');
+      const data = await res.json();
+      setProjects(data.projects || []);
+    } catch (err) {
+      console.error('Project fetch error:', err);
+    }
+  };
+
+  // ✅ New Chat
+  const handleNewChat = async () => {
+    try {
+      const defaultTitle = `New Chat ${new Date().toLocaleTimeString()}`;
+      const res = await fetch('http://localhost:3000/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: defaultTitle }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConversations([data.chat, ...conversations]);
+        onChatSelect(data.chat.id); // open chat immediately
+        onClose();
+      }
+    } catch (err) {
+      console.error('Error creating chat:', err);
+    }
+  };
+
+  // ✅ New Project
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim()) return;
+    try {
+      const res = await fetch('/api/project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newProjectName }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setProjects([data.project, ...projects]);
+        setShowProjectModal(false);
+        setNewProjectName('');
+      }
+    } catch (err) {
+      console.error('Error creating project:', err);
+    }
+  };
+
+  // ✅ Rename
+  const saveEdit = async (type, id) => {
+    if (!editTitle.trim()) {
+      setEditingId(null);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/${type}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: editTitle }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (type === 'chat') {
+          setConversations(conversations.map(c => c.id === id ? { ...c, title: editTitle } : c));
+        } else {
+          setProjects(projects.map(p => p.id === id ? { ...p, name: editTitle } : p));
+        }
+      }
+    } catch (err) {
+      console.error('Error updating title:', err);
+    } finally {
+      setEditingId(null);
+    }
+  };
+
+  // ✅ Delete
+  const handleDelete = async (type, id) => {
+    if (!confirm('Delete karna chahte hain?')) return;
+    try {
+      const res = await fetch(`/api/${type}/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        if (type === 'chat') {
+          setConversations(conversations.filter(c => c.id !== id));
+          if (currentChatId === id) onChatSelect(null);
+        } else {
+          setProjects(projects.filter(p => p.id !== id));
+        }
+      }
+    } catch (err) {
+      console.error('Error deleting:', err);
+    } finally {
+      setShowMenu(null);
+    }
+  };
+
+  // ✅ Edit start
+  const startEdit = (item, type) => {
+    setEditingId(`${type}-${item.id}`);
+    setEditTitle(item.title || item.name);
+    setShowMenu(null);
+  };
+
+  const filteredChats = conversations.filter(c =>
+    c.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const filteredProjects = projects.filter(p =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <>
+      {isOpen && (
+        <div className="lg:hidden fixed inset-0 bg-black/50 z-20" onClick={onClose} />
+      )}
+
+      <aside
+        className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r transform duration-300 flex flex-col ${
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        {/* Header */}
+        <div className="p-3 border-b flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
+              <MessageSquare className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-semibold text-gray-800">RAG Chatbot</span>
+          </div>
+          <button onClick={onClose} className="lg:hidden p-1 hover:bg-gray-100 rounded">
+            <X className="w-5 h-5 text-gray-600" />
+          </button>
+        </div>
+
+        {/* Buttons */}
+        <div className="p-3 flex flex-col gap-2">
+          <button
+            onClick={handleNewChat}
+            className="flex items-center gap-2 px-3 py-2 border rounded-lg hover:bg-gray-50"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="text-sm font-medium">New Chat</span>
+          </button>
+          <button
+            onClick={() => setShowProjectModal(true)}
+            className="flex items-center gap-2 px-3 py-2 border rounded-lg hover:bg-gray-50"
+          >
+            <Folder className="w-4 h-4" />
+            <span className="text-sm font-medium">New Project</span>
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="px-3 pb-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-gray-50 rounded-lg text-sm focus:ring-2 focus:ring-gray-200 outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Projects */}
+        <div className="px-3">
+          <div className="text-xs font-semibold text-gray-500 px-3 py-2">Projects</div>
+          <div className="space-y-0.5">
+            {filteredProjects.map((p) => (
+              <div key={p.id} className="group relative rounded-lg hover:bg-gray-50">
+                <button
+                  onClick={() => {
+                    onProjectSelect(p.id);
+                    onClose();
+                  }}
+                  className="w-full text-left px-3 py-2 flex justify-between"
+                >
+                  {editingId === `project-${p.id}` ? (
+                    <div className="flex items-center gap-1 w-full">
+                      <input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveEdit('project', p.id);
+                          if (e.key === 'Escape') setEditingId(null);
+                        }}
+                        className="text-sm border rounded px-2 py-1 w-full"
+                        autoFocus
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          saveEdit('project', p.id);
+                        }}
+                        className="p-1 hover:bg-gray-200 rounded"
+                      >
+                        <Check className="w-3.5 h-3.5 text-green-600" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex-1 text-sm truncate text-gray-800 flex items-center gap-2">
+                      <Folder className="w-4 h-4 text-gray-600" />
+                      {p.name}
+                    </div>
+                  )}
+                  <div className="relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowMenu(showMenu === p.id ? null : p.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded"
+                    >
+                      <MoreVertical className="w-4 h-4 text-gray-600" />
+                    </button>
+                    {showMenu === p.id && (
+                      <div className="absolute right-0 mt-1 w-32 bg-white border rounded-lg shadow-lg z-20">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEdit(p, 'project');
+                          }}
+                          className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 w-full"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" /> Rename
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete('project', p.id);
+                          }}
+                          className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Chats */}
+        <div className="flex-1 overflow-y-auto px-3 mt-2">
+          <div className="text-xs font-semibold text-gray-500 px-3 py-2">Chats</div>
+          {loading ? (
+            <p className="text-center py-6 text-gray-500 text-sm">Loading...</p>
+          ) : (
+            filteredChats.map((c) => (
+              <div key={c.id} className="group relative rounded-lg hover:bg-gray-50">
+                <button
+                  onClick={() => {
+                    onChatSelect(c.id);
+                    onClose();
+                  }}
+                  className="w-full text-left px-3 py-2 flex justify-between"
+                >
+                  {editingId === `chat-${c.id}` ? (
+                    <div className="flex items-center gap-1 w-full">
+                      <input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveEdit('chat', c.id);
+                          if (e.key === 'Escape') setEditingId(null);
+                        }}
+                        className="text-sm border rounded px-2 py-1 w-full"
+                        autoFocus
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          saveEdit('chat', c.id);
+                        }}
+                        className="p-1 hover:bg-gray-200 rounded"
+                      >
+                        <Check className="w-3.5 h-3.5 text-green-600" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex-1 text-sm truncate text-gray-800 flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-gray-600" />
+                      {c.title}
+                    </div>
+                  )}
+                  <div className="relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowMenu(showMenu === c.id ? null : c.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded"
+                    >
+                      <MoreVertical className="w-4 h-4 text-gray-600" />
+                    </button>
+                    {showMenu === c.id && (
+                      <div className="absolute right-0 mt-1 w-32 bg-white border rounded-lg shadow-lg z-20">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEdit(c, 'chat');
+                          }}
+                          className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 w-full"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" /> Rename
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete('chat', c.id);
+                          }}
+                          className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      
+      </aside>
+
+      {/* Project Modal */}
+      {showProjectModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40">
+          <div className="bg-white rounded-xl shadow-lg p-5 w-80">
+            <h2 className="text-lg font-semibold mb-3">Create New Project</h2>
+            <input
+              type="text"
+              placeholder="Project name..."
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 mb-3"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowProjectModal(false)}
+                className="px-3 py-2 text-sm border rounded-lg hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateProject}
+                className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

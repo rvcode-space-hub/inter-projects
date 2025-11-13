@@ -1,27 +1,11 @@
-Pinecone = pcsk_C8XZB_L41K5AkczMqPk8p34ecbj2tgDgkGevtoWHA5ngvTx93TNjDwoDFnJ8Xp4LKVCHR
-AI SKD = npm install @ai-sdk/google
-ShadCN UI = npx shadcn@latest init
-Pinecone=npm install @pinecone-database/pinecone
-
-
-
-
-
-
-
-
-
---------------------------
-import formidable from "formidable";
+import { unstable_parseMultipartFormData, File } from 'next/server';
 import fs from "fs";
 import { extractText } from "../../../lib/extractText";
 import { chunkText } from "../../../lib/chunkText";
 import initPinecone from "../../../lib/pineconeClient";
 import { generateEmbedding } from "../../../lib/embeddings";
 
-export const config = {
-  api: { bodyParser: false },
-};
+export const config = { api: { bodyParser: false } };
 
 function batchArray(array, batchSize) {
   const batches = [];
@@ -33,23 +17,16 @@ function batchArray(array, batchSize) {
 
 export const POST = async (req) => {
   try {
-    const form = new formidable.IncomingForm({ multiples: false, keepExtensions: true });
-
-    const data = await new Promise((resolve, reject) => {
-      form.parse(req, (err, fields, files) => {
-        if (err) reject(err);
-        else resolve({ fields, files });
-      });
+    const formData = await unstable_parseMultipartFormData(req, (file) => {
+      const tempPath = `./tmp/${file.name}`;
+      fs.writeFileSync(tempPath, file.arrayBuffer());
+      return tempPath;
     });
 
-    const file = data.files.file;
-    if (!file) return new Response(JSON.stringify({ error: "No file uploaded" }), { status: 400 });
+    const filePath = formData.get('file');
+    if (!filePath) return new Response(JSON.stringify({ error: "No file uploaded" }), { status: 400 });
 
-    const filePath = file.filepath;
-    const fileType = file.originalFilename.split(".").pop().toLowerCase();
-
-    const text = await extractText(filePath, fileType);
-    console.log("Extracted text length:", text.length);
+    const text = await extractText(filePath, filePath.split('.').pop());
     const chunks = chunkText(text);
     const index = await initPinecone();
 
